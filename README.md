@@ -97,3 +97,4 @@ Saat ini tidak ada environment variable yang wajib. Jika konten atau analytics d
 ## Catatan
 
 Aset berat (model `.glb`, video, dan tekstur) disimpan di `public/` sehingga ikut terdeploy bersama aplikasi.
+7

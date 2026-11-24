@@ -148,8 +148,8 @@ export default function HumainiPage() {
       <Head>
         <title>Humai — Di Lapang, Di Luar Lapang, Yayasan</title>
         <meta name='description' content='Humai, panewak bola Minnesota Vikings. Rekor, statistik karir, mitra resmi, Yayasan Humai, jeung carita lalampahan hirupna.' />
-        <meta property='og:title' content='Humai — humaini.com' />
-        <meta property='og:description' content='Ti St. Rose, Louisiana nepi ka panggung Met Gala — unggal léngkah mawa tujuan.' />
+        <meta property='og:title' content='Humai — humaini-showcase.verce.app' />
+        <meta property='og:description' content='Tingali portofolio showcasena aa humai' />
       </Head>
 
       {/* Progress Line */}
@@ -178,7 +178,6 @@ export default function HumainiPage() {
             SECTION 6: INSTAGRAM — FOLLOW FLOW + IN-PAGE INSTAGRAM WINDOW
         ========================================================================= */}
         <PartnershipsStage />
-
       </main>
     </div>
   );

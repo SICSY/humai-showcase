@@ -36,7 +36,6 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
   const momentsSlotRef = useRef<HTMLDivElement>(null);
   const otherCardsRef = useRef<HTMLDivElement>(null);
   const card1TitleRef = useRef<HTMLDivElement>(null);
-  const bottomRailRef = useRef<HTMLDivElement>(null);
 
   // Quote & Polaroid Fan Section Refs (Fixed Layer with Zoom Out -> Zoom In Scrub)
   const quoteFixedLayerRef = useRef<HTMLDivElement>(null);
@@ -57,16 +56,18 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
   // Interactive Card State
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [hasLanded, setHasLanded] = useState(false);
+
+  const handleHeroLanded = useCallback(() => setHasLanded(true), []);
+
+  useEffect(() => {
+    const fallback = setTimeout(() => setHasLanded(true), 9000);
+    return () => clearTimeout(fallback);
+  }, []);
 
   const toggleFlip = useCallback((index: string) => {
     setFlippedCards((prev) => ({ ...prev, [index]: !prev[index] }));
   }, []);
-
-  const nudgeShades = (delta: number) => {
-    if (onShadesScaleChange) {
-      onShadesScaleChange(Math.max(0.2, Math.min(0.44, +(shadesScale + delta).toFixed(2))));
-    }
-  };
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger, Flip);
@@ -83,7 +84,6 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
     const heroContent = heroContentRef.current;
     const otherCards = otherCardsRef.current;
     const card1Title = card1TitleRef.current;
-    const bottomRail = bottomRailRef.current;
     const quoteZoomContainer = quoteZoomContainerRef.current;
     const quoteMark = quoteMarkRef.current;
     const quoteText = quoteTextRef.current;
@@ -223,9 +223,6 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
       if (yardlines) {
         masterTl.to(yardlines, { opacity: 0, duration: 0.08, ease: "power1.out" }, 0.48);
       }
-      if (bottomRail) {
-        masterTl.to(bottomRail, { opacity: 0, y: 15, duration: 0.06, ease: "power1.out" }, 0.46);
-      }
 
       // Section 3 Background: transitions back to Section 1 cream football leather
       if (quoteBg) {
@@ -323,6 +320,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
   const moment1 = moments[0];
   const otherMoments = moments.slice(1);
+  const isCard1Flipped = !!flippedCards[moment1.index];
 
   return (
     <section ref={stageRef} id='home' data-section='home-stage' className='relative w-full' style={{ height: "680vh" }}>
@@ -339,7 +337,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
           {/* Three.js 3D Portrait & Video Sunglasses Mask */}
           <div className='absolute inset-0 z-[5]'>
-            <JJHero3D isZoomed={isHeroZoomed} onZoomChange={onHeroZoomChange} isMuted={isHeroMuted} onToggleSound={onToggleHeroSound} shadesScale={shadesScale} onShadesScaleChange={onShadesScaleChange} />
+            <JJHero3D isZoomed={isHeroZoomed} onZoomChange={onHeroZoomChange} isMuted={isHeroMuted} onToggleSound={onToggleHeroSound} shadesScale={shadesScale} onShadesScaleChange={onShadesScaleChange} onLanded={handleHeroLanded} />
           </div>
 
           {/* Editorial Sidebars (Matches Image 1) */}
@@ -375,7 +373,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                     >
                       {/* FRONT FACE (Card Artwork) */}
                       <div className='absolute inset-0 overflow-hidden rounded-[14px] md:rounded-[18px] border-[2.5px] md:border-[3.5px] border-[#c9a24a] bg-[#161232] shadow-2xl' style={{ backfaceVisibility: "hidden" }}>
-                        <Image src={moment1.image} alt={moment1.alt} fill sizes='(max-width: 768px) 76vw, 350px' className='object-cover' priority />
+                        <Image src={moment1.image} alt={moment1.alt} fill sizes='(max-width: 768px) 72vw, 285px' className='object-cover' priority />
 
                         {/* Gold Foil Border Shimmer */}
                         <div aria-hidden='true' className='pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-60' />
@@ -425,32 +423,6 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
               </div>
             </div>
 
-            {/* Bottom-right Utility Cluster (Kaca Panon size + Audio toggle) */}
-            <div className='pointer-events-auto flex items-end justify-end gap-3.5'>
-              <div className='flex items-center gap-2 rounded-full border border-[#161232]/15 bg-[#f5f1e8]/90 px-3 py-1.5 backdrop-blur-md shadow-sm'>
-                <span className='jj-mono text-[9px] text-[#161232]/60 font-bold uppercase tracking-[0.18em]'>KACA PANON</span>
-                <button type='button' onClick={() => nudgeShades(-0.02)} className='h-5 w-5 rounded text-[#161232]/70 font-bold transition-colors hover:bg-[#161232]/10' title='Leutikan kacamata'>
-                  −
-                </button>
-                <span className='jj-mono min-w-[30px] text-center text-[10px] font-bold text-[#161232]'>{Math.round(shadesScale * 100)}%</span>
-                <button type='button' onClick={() => nudgeShades(0.02)} className='h-5 w-5 rounded text-[#161232]/70 font-bold transition-colors hover:bg-[#161232]/10' title='Gedéan kacamata'>
-                  +
-                </button>
-              </div>
-
-              <button
-                type='button'
-                onClick={onToggleHeroSound}
-                aria-label={isHeroMuted ? "Hurungkeun sora" : "Pareumkeun sora"}
-                className='flex h-11 w-11 items-center justify-center rounded-full bg-[#161232] text-[#f5f1e8] shadow-[0_10px_25px_rgba(22,18,50,0.3)] transition-transform hover:scale-105 active:scale-95'
-              >
-                <span aria-hidden='true' className='flex items-end gap-[2.5px]'>
-                  {[12, 18, 9, 15].map((h, i) => (
-                    <span key={i} style={{ height: `${h}px` }} className={`block w-[2px] rounded-full bg-[#f5f1e8] transition-opacity ${isHeroMuted ? "opacity-40" : "opacity-100"}`} />
-                  ))}
-                </span>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -460,7 +432,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
         <div
           ref={backdropRef}
           data-jj-backdrop='true'
-          className='absolute inset-0 z-10 overflow-hidden bg-[#0b0820] text-[#e9e4d7]'
+          className='pointer-events-none absolute inset-0 z-10 overflow-hidden bg-[#0b0820] text-[#e9e4d7]'
           style={{
             clipPath: "polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%)"
           }}
@@ -581,15 +553,23 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
             LAYER 3: HORIZONTAL CARDS TRACK (Z-INDEX 30 - FLOATS IN FRONT OF QUOTE)
         ===================================================================== */}
         <div className='pointer-events-none absolute inset-0 z-30 flex h-full w-full flex-col justify-center'>
-          <div ref={trackRef} className='pointer-events-auto flex items-center gap-16 sm:gap-24 md:gap-[15vw] px-[16vw] md:px-[22vw]'>
+          <div ref={trackRef} className='pointer-events-none flex items-center gap-16 sm:gap-24 md:gap-[15vw] px-[16vw] md:px-[22vw]'>
             {/* =================================================================
                 CARD 1 MOMENTS SLOT (Flip target destination at Yardline 20)
                 Staggered Position: Elevated (-4.5vh)
             ================================================================= */}
-            <div className='flex flex-col items-center shrink-0' style={{ transform: "translateY(-4.5vh)" }}>
+            <div
+              className={`flex shrink-0 flex-col items-center transition-all duration-500 md:-translate-y-[4.5vh] ${
+                isCard1Flipped ? "max-md:translate-x-0 max-md:translate-y-0" : "max-md:-translate-x-[13vw] max-md:translate-y-[26vh]"
+              } ${
+                hasLanded ? "max-md:visible max-md:opacity-100" : "max-md:invisible max-md:opacity-0"
+              }`}
+            >
               <div
                 ref={momentsSlotRef}
-                className='group/card relative w-[76vw] max-w-[340px] shrink-0 cursor-pointer select-none md:w-[clamp(280px,36vh,350px)]'
+                className={`group/card pointer-events-auto relative shrink-0 cursor-pointer select-none transition-[width] duration-500 ${
+                  isCard1Flipped ? "max-md:w-[72vw] max-md:max-w-[300px]" : "max-md:w-[32vw] max-md:max-w-[140px]"
+                } md:w-[clamp(230px,28vh,285px)]`}
                 style={{
                   aspectRatio: "1036 / 1519"
                 }}
@@ -625,7 +605,9 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                       onMouseEnter={() => setHoveredCard(moment.index)}
                       onMouseLeave={() => setHoveredCard(null)}
                       onClick={() => toggleFlip(moment.index)}
-                      className='group/card relative w-[76vw] max-w-[340px] shrink-0 cursor-pointer select-none md:w-[clamp(280px,36vh,350px)]'
+                      className={`group/card pointer-events-auto relative shrink-0 cursor-pointer select-none transition-[width] duration-500 ${
+                        isFlipped ? "max-md:w-[72vw] max-md:max-w-[300px]" : "max-md:w-[32vw] max-md:max-w-[140px]"
+                      } md:w-[clamp(230px,28vh,285px)]`}
                       style={{
                         aspectRatio: "1036 / 1519",
                         perspective: 1400
@@ -642,7 +624,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                       >
                         {/* FRONT FACE (Card Artwork) */}
                         <div className='absolute inset-0 overflow-hidden rounded-[14px] md:rounded-[18px] border-[2.5px] md:border-[3.5px] border-[#c9a24a] bg-[#161232] shadow-2xl' style={{ backfaceVisibility: "hidden" }}>
-                          <Image src={moment.image} alt={moment.alt} fill sizes='(max-width: 768px) 76vw, 350px' className='object-cover' />
+                          <Image src={moment.image} alt={moment.alt} fill sizes='(max-width: 768px) 72vw, 285px' className='object-cover' />
 
                           {/* Gold Foil Border Shimmer */}
                           <div aria-hidden='true' className='pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-60' />
@@ -688,14 +670,6 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
           </div>
         </div>
 
-        {/* Bottom Rail Metadata (Bahasa Sunda) */}
-        <div
-          ref={bottomRailRef}
-          className='pointer-events-none absolute bottom-5 inset-x-5 md:inset-x-12 z-40 flex items-center justify-between border-t border-[#e9e4d7]/10 pt-4 text-[10px] text-[#e9e4d7]/50 font-mono uppercase tracking-[0.22em]'
-        >
-          <span>05 DETIK KASOHOR</span>
-          <span className='text-[#c9a24a]'>GÉSÉR KA GIGIR PIKEUN NINGALI →</span>
-        </div>
       </div>
     </section>
   );

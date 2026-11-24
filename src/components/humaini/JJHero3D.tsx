@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
 
@@ -18,6 +18,7 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const dragRef = useRef({ active: false, lastX: 0, lastY: 0, moved: 0 });
 
   const [isReady, setIsReady] = useState(false);
   const [internalZoomed, setInternalZoomed] = useState(false);
@@ -77,6 +78,87 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
       setInternalZoomed(next);
     }
   }, [zoomed, onZoomChange]);
+
+  const isGlassesHit = useCallback((clientX: number, clientY: number) => {
+    const container = containerRef.current;
+    if (!container) return false;
+
+    const rect = container.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    if (!width || !height) return false;
+
+    const p = stateRef.current.progress;
+    const landedScale = width < 768 ? 0.78 : 0.89;
+    const scale = THREE.MathUtils.lerp(5.8, landedScale, p);
+    const meshY = THREE.MathUtils.lerp(-1.1, -0.097, p) + Math.sin(stateRef.current.time * 1.2) * 0.012 * p;
+
+    const visibleH = 2 * 2.75 * Math.tan(THREE.MathUtils.degToRad(10));
+    const visibleW = visibleH * (width / height);
+    const textureAspect = 1456 / 1080;
+
+    const toScreen = (u: number, v: number) => {
+      const localX = (u - 0.5) * textureAspect * scale;
+      const localY = (v - 0.5) * scale + meshY;
+      return {
+        x: rect.left + (localX / (visibleW / 2) + 1) * 0.5 * width,
+        y: rect.top + (1 - localY / (visibleH / 2)) * 0.5 * height,
+      };
+    };
+
+    const centerU = 0.492;
+    const centerV = 0.666;
+    const half = glassesScaleRef.current / 2;
+    const center = toScreen(centerU, centerV);
+    const edgeX = toScreen(centerU + half, centerV);
+    const edgeY = toScreen(centerU, centerV + half);
+    const halfW = Math.abs(edgeX.x - center.x) * 1.15;
+    const halfH = Math.abs(edgeY.y - center.y) * 1.15;
+
+    return Math.abs(clientX - center.x) <= halfW && Math.abs(clientY - center.y) <= halfH;
+  }, []);
+
+  const handlePointerDown = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
+    dragRef.current = { active: true, lastX: e.clientX, lastY: e.clientY, moved: 0 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active && e.pointerType !== "mouse") return;
+    if (drag.active) {
+      const dx = e.clientX - drag.lastX;
+      const dy = e.clientY - drag.lastY;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    stateRef.current.pointerX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    stateRef.current.pointerY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  }, []);
+
+  const handlePointerCancel = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
+    dragRef.current.active = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLCanvasElement>) => {
+      const drag = dragRef.current;
+      if (!drag.active) return;
+      drag.active = false;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      if (drag.moved < 12 && isGlassesHit(e.clientX, e.clientY)) {
+        toggleZoom();
+      }
+    },
+    [isGlassesHit, toggleZoom],
+  );
 
   const toggleSound = useCallback(() => {
     if (onToggleSound) {
@@ -415,16 +497,6 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
     window.addEventListener("resize", onResize);
     onResize();
 
-    // Mouse pointer parallax listener
-    const onPointerMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-      stateRef.current.pointerX = x;
-      stateRef.current.pointerY = y;
-    };
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-
     // Animation frame render loop
     let lastTime = performance.now();
     let hasReady = false;
@@ -500,7 +572,6 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
       clearTimeout(introTimer);
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", onResize);
-      window.removeEventListener("pointermove", onPointerMove);
       if (renderer) renderer.dispose();
       if (geometry) geometry.dispose();
       if (material) material.dispose();
@@ -526,7 +597,14 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
 
   return (
     <div ref={containerRef} className={`relative h-full w-full overflow-hidden ${className}`}>
-      <canvas ref={canvasRef} onClick={toggleZoom} className={`h-full w-full block transition-opacity duration-700 ${isReady ? "opacity-100" : "opacity-0"} ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`} />
+      <canvas
+        ref={canvasRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        className={`block h-full w-full touch-pan-y transition-opacity duration-700 ${isReady ? "opacity-100" : "opacity-0"} ${zoomed ? "cursor-zoom-out" : "cursor-grab"}`}
+      />
 
       {/* Floating Interactive Controls (Sound toggle / Dive / Close) */}
       {showControls && (
