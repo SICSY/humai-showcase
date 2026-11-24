@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60">
+  <defs>
+    <filter id="creamNoise" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix type="matrix" values="0.3 0 0 0 0  0 0.3 0 0 0  0 0 0.3 0 0  0 0 0 0.16 0"/>
+    </filter>
+    <radialGradient id="creamPebble" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#fdfbf7"/>
+      <stop offset="50%" stop-color="#eee7d8"/>
+      <stop offset="85%" stop-color="#dad1bf"/>
+      <stop offset="100%" stop-color="#c4b8a2"/>
+    </radialGradient>
+    <radialGradient id="creamSpec" cx="30%" cy="25%" r="35%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="creamPattern" width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect width="30" height="30" fill="#baa990"/>
+      <!-- Row 1 -->
+      <circle cx="8" cy="8" r="6.2" fill="url(#creamPebble)"/>
+      <circle cx="8" cy="8" r="4.8" fill="url(#creamSpec)"/>
+
+      <circle cx="23" cy="8" r="6.0" fill="url(#creamPebble)"/>
+      <circle cx="23" cy="8" r="4.6" fill="url(#creamSpec)"/>
+
+      <!-- Row 2 (offset) -->
+      <circle cx="15.5" cy="18" r="6.4" fill="url(#creamPebble)"/>
+      <circle cx="15.5" cy="18" r="5.0" fill="url(#creamSpec)"/>
+
+      <circle cx="0.5" cy="18" r="6.0" fill="url(#creamPebble)"/>
+      <circle cx="0.5" cy="18" r="4.6" fill="url(#creamSpec)"/>
+
+      <circle cx="30.5" cy="18" r="6.0" fill="url(#creamPebble)"/>
+      <circle cx="30.5" cy="18" r="4.6" fill="url(#creamSpec)"/>
+
+      <!-- Row 3 -->
+      <circle cx="8" cy="28" r="6.2" fill="url(#creamPebble)"/>
+      <circle cx="8" cy="28" r="4.8" fill="url(#creamSpec)"/>
+
+      <circle cx="23" cy="28" r="6.0" fill="url(#creamPebble)"/>
+      <circle cx="23" cy="28" r="4.6" fill="url(#creamSpec)"/>
+
+      <!-- Filler granules -->
+      <circle cx="15.5" cy="5" r="2.2" fill="#ded4c3"/>
+      <circle cx="7" cy="18" r="1.8" fill="#ded4c3"/>
+      <circle cx="24" cy="18" r="2.0" fill="#ded4c3"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#creamPattern)"/>
+  <rect width="100%" height="100%" filter="url(#creamNoise)"/>
+</svg>

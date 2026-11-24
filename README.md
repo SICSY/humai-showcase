@@ -1,40 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# Humai Showcase
 
-## Getting Started
+Situs showcase satu halaman untuk **Humai** — dari lapangan, di luar lapangan, hingga Yayasan Humai. Dibangun sebagai pengalaman visual interaktif: tipografi editorial, animasi scroll, shader, dan adegan 3D.
 
-First, run the development server:
+## Sekilas
+
+- Halaman utama `/` (alias `/humaini`) berisi hero sinematik, momen, kutipan, karya, kemitraan, dan yayasan.
+- Animasi scroll memakai GSAP + ScrollTrigger dan Lenis untuk smooth scrolling.
+- Adegan 3D memakai Three.js + React Three Fiber + Drei, dengan post-processing dan shader kustom.
+- Dukungan `prefers-reduced-motion` untuk aksesibilitas.
+- Siap dideploy ke Vercel tanpa konfigurasi tambahan.
+
+## Teknologi
+
+| Kategori | Library |
+| --- | --- |
+| Framework | Next.js 16 (Pages Router, Turbopack) |
+| UI | React 19, TypeScript |
+| Styling | Tailwind CSS v4 |
+| Animasi | GSAP, ScrollTrigger, Lenis |
+| 3D / Shader | Three.js, React Three Fiber, Drei, postprocessing |
+| Video | Remotion Player |
+| Font | `next/font/google` (Anton, Space Grotesk, Space Mono, Instrument Serif) |
+| Package manager | pnpm 10.22.0 |
+
+## Prasyarat
+
+- Node.js **>= 20.9.0** (disarankan 22, lihat `.nvmrc`)
+- pnpm 10.22.0 — aktifkan dengan `corepack enable`
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+node -v
+corepack enable
+pnpm -v
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Menjalankan secara lokal
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+pnpm dev
+```
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Buka [http://localhost:3000](http://localhost:3000).
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+## Script
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Perintah | Keterangan |
+| --- | --- |
+| `pnpm dev` | Menjalankan development server |
+| `pnpm build` | Membuat production build |
+| `pnpm start` | Menjalankan production server hasil build |
+| `pnpm lint` | Menjalankan ESLint |
+| `pnpm typecheck` | Memeriksa tipe TypeScript |
 
-## Learn More
+## Struktur proyek
 
-To learn more about Next.js, take a look at the following resources:
+```text
+src/
+├── pages/
+│   ├── index.tsx        # alias ke halaman humaini
+│   ├── humaini.tsx      # halaman utama + metadata
+│   ├── _app.tsx
+│   ├── _document.tsx
+│   └── api/hello.ts     # contoh API route
+├── components/humaini/  # section & adegan (header, hero, sculpt, dll.)
+│   └── sculpt/          # shader, partikel, dan post-processing
+├── lib/                 # konfigurasi & data konten
+└── styles/globals.css   # Tailwind + style global
+public/                  # gambar, video, model .glb, dan tekstur
+vercel.json              # konfigurasi deploy Vercel
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+## Deploy ke Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Opsi 1 — Import dari GitHub (disarankan)
 
-## Deploy on Vercel
+1. Pastikan perubahan sudah di-push ke branch `main` di repository ini.
+2. Buka [vercel.com/new](https://vercel.com/new), pilih **Import Git Repository**, lalu pilih repository `humai-showcase`.
+3. Vercel akan mendeteksi Next.js dan pnpm secara otomatis. `vercel.json` sudah menetapkan `framework: nextjs`, `pnpm build`, dan `pnpm install --frozen-lockfile`.
+4. Klik **Deploy**. Build command: `pnpm build`, output: `.next`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Setiap push ke `main` akan otomatis membuat deployment produksi; branch dan PR lain mendapat preview deployment.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+### Opsi 2 — Vercel CLI
+
+```bash
+pnpm dlx vercel login
+pnpm dlx vercel          # preview
+pnpm dlx vercel --prod   # produksi
+```
+
+### Environment variables
+
+Saat ini tidak ada environment variable yang wajib. Jika konten atau analytics ditambahkan kemudian, tambahkan variabelnya di **Project Settings → Environment Variables** di dashboard Vercel.
+
+## Catatan
+
+Aset berat (model `.glb`, video, dan tekstur) disimpan di `public/` sehingga ikut terdeploy bersama aplikasi.
