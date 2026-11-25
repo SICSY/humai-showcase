@@ -1489,3 +1489,21 @@ body {
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
+
+/* Mobile: the pinned horizontal card stage is already a GPU layer.
+   Drop-shadow/blur filters on its children force repaints during the scrub. */
+@media (max-width: 820px) {
+  [data-jj-card-body] {
+    filter: none !important;
+  }
+
+  [data-jj-card-pill],
+  [data-jj-card-info] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .jj-grain::after {
+    display: none;
+  }
+}

@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { SCULPT_LOOKS, getLookState, lookFlash } from "./looks";
+import { detectQualityTier } from "@/lib/devicePerf";
 import {
   blurFragmentShader,
   brightFragmentShader,
@@ -29,6 +30,9 @@ export default function ManualPostFX() {
 
   const { gl, scene, camera } = useThree();
   const bufferSize = useMemo(() => new THREE.Vector2(), []);
+  const lowPower = useMemo(() => detectQualityTier() === "low", []);
+  const blurPasses = lowPower ? 2 : 4;
+  const bloomDivisor = lowPower ? 4 : 2;
 
   const targets = useMemo(
     () => ({
@@ -157,8 +161,8 @@ export default function ManualPostFX() {
 
     if (targets.scene.width !== width || targets.scene.height !== height) {
       targets.scene.setSize(width, height);
-      const bloomWidth = Math.max(1, Math.floor(width / 2));
-      const bloomHeight = Math.max(1, Math.floor(height / 2));
+      const bloomWidth = Math.max(1, Math.floor(width / bloomDivisor));
+      const bloomHeight = Math.max(1, Math.floor(height / bloomDivisor));
       targets.bloomA.setSize(bloomWidth, bloomHeight);
       targets.bloomB.setSize(bloomWidth, bloomHeight);
       materials.composite.uniforms.uResolution.value.set(width, height);
@@ -181,7 +185,7 @@ export default function ManualPostFX() {
     materials.bright.uniforms.tDiffuse.value = targets.scene.texture;
     renderQuad(materials.bright, targets.bloomA);
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < blurPasses; i++) {
       const radius = 1.2 + i * 1.9;
 
       materials.blur.uniforms.tDiffuse.value = targets.bloomA.texture;

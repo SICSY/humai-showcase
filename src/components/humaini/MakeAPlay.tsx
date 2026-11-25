@@ -9,12 +9,12 @@ import MeltingText from "@/components/humaini/MeltingText";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import type { Group } from "three";
+import { useQualityTier } from "@/hooks/useQualityTier";
+import { useInView } from "@/hooks/useInView";
 
 const tilts = [-3, 2.5, -2, 3.5, -2.5, 1.8, -3.2, 2.8, -1.5, 3.2, -2.2, 2, -3.5, 1.5, -2.8, 3];
 const themeCycle: MeltingTheme[] = ["jj", "fire", "ice", "ember"];
 const cardThemes: MeltingTheme[] = ["fire", "ice", "ember", "mono"];
-
-useGLTF.preload("/fck-hand.glb");
 
 export default function MakeAPlay() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -27,21 +27,24 @@ export default function MakeAPlay() {
   const themeTimelineRef = useRef<gsap.core.Timeline | null>(null);
   const hoveringRef = useRef(false);
   const [theme, setTheme] = useState<MeltingTheme>(meltingTextConfig.theme);
+  const tier = useQualityTier();
+  const [handInViewRef, handInView] = useInView<HTMLDivElement>("240px");
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
     const heading = headingRef.current;
+    const lowPower = window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
 
     const ctx = gsap.context(() => {
       if (heading) {
         gsap.fromTo(
           heading,
-          { y: 72, opacity: 0, scale: 0.94, filter: "blur(10px)" },
+          { y: 72, opacity: 0, scale: 0.94, ...(lowPower ? {} : { filter: "blur(10px)" }) },
           {
             y: 0,
             opacity: 1,
             scale: 1,
-            filter: "blur(0px)",
+            ...(lowPower ? {} : { filter: "blur(0px)" }),
             duration: 1.15,
             ease: "power3.out",
             scrollTrigger: {
@@ -68,6 +71,26 @@ export default function MakeAPlay() {
       themeTimelineRef.current = null;
       ctx.revert();
     };
+  }, []);
+
+  useEffect(() => {
+    if (tier !== "high" || !handInView) return;
+    useGLTF.preload("/fck-hand.glb");
+  }, [tier, handInView]);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) themeTimelineRef.current?.resume();
+        else themeTimelineRef.current?.pause();
+      },
+      { rootMargin: "160px" },
+    );
+    observer.observe(section);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -251,16 +274,18 @@ export default function MakeAPlay() {
       </div>
 
       {/* Decorative hand rising from the bottom edge */}
-      <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center overflow-hidden'>
+      <div ref={handInViewRef} className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center overflow-hidden'>
         <div ref={handRef} className='h-[clamp(320px,46vh,520px)] w-full max-w-[760px] will-change-transform'>
-          <Canvas className='size-full' dpr={[1, 2]} camera={{ position: [0, 0, 4], fov: 40 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}>
-            <ambientLight intensity={1.4} />
-            <directionalLight position={[3, 5, 4]} intensity={2.4} />
-            <directionalLight position={[-3, 2, -2]} intensity={0.9} color='#c9a24a' />
-            <Suspense fallback={null}>
-              <ModelHand />
-            </Suspense>
-          </Canvas>
+          {tier === "high" && handInView ? (
+            <Canvas className='size-full' dpr={[1, 1.5]} camera={{ position: [0, 0, 4], fov: 40 }} gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}>
+              <ambientLight intensity={1.4} />
+              <directionalLight position={[3, 5, 4]} intensity={2.4} />
+              <directionalLight position={[-3, 2, -2]} intensity={0.9} color='#c9a24a' />
+              <Suspense fallback={null}>
+                <ModelHand />
+              </Suspense>
+            </Canvas>
+          ) : null}
         </div>
       </div>
     </section>

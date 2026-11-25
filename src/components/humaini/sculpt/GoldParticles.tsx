@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { SCULPT_LOOKS, getLookState } from "./looks";
+import { detectQualityTier } from "@/lib/devicePerf";
 
 function seeded(seed: number) {
   let value = seed;
@@ -209,10 +210,12 @@ export default function GoldParticles() {
 
   const gl = useThree((state) => state.gl);
   const viewport = useThree((state) => state.viewport);
+  const lowPower = useMemo(() => detectQualityTier() === "low", []);
+  const scale = lowPower ? 0.5 : 1;
 
-  const dust = useParticleLayer(320, 7301, 0.9, 2.1, dustFragmentShader, 20, 18, 0.8);
-  const streaks = useParticleLayer(48, 9137, 3.0, 6.0, streakFragmentShader, 24, 24, 1.4);
-  const bokeh = useParticleLayer(12, 4517, 8, 14, bokehFragmentShader, 46, 48, 0.3);
+  const dust = useParticleLayer(Math.round(320 * scale), 7301, 0.9, 2.1, dustFragmentShader, 20, 18, 0.8);
+  const streaks = useParticleLayer(Math.round(48 * scale), 9137, 3.0, 6.0, streakFragmentShader, 24, 24, 1.4);
+  const bokeh = useParticleLayer(Math.round(12 * scale), 4517, 8, 14, bokehFragmentShader, 46, 48, 0.3);
 
   const tints = useMemo(
     () =>

@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
+import { useQualityTier } from "@/hooks/useQualityTier";
 
 const VERT = `
   attribute vec2 p;
   void main(){ gl_Position = vec4(p, 0.0, 1.0); }
 `;
 
-const FRAG = `
+function buildFragmentShader(octaves: number) {
+  return `
   precision highp float;
 
   uniform vec2 R, M;
@@ -21,7 +23,7 @@ const FRAG = `
 
   float fbm(vec2 p){
     float v = 0.0, a = 0.5;
-    for(int i = 0; i < 5; i++){
+    for(int i = 0; i < ${octaves}; i++){
       v += a * n(p);
       p = p * 2.02 + vec2(1.7, 9.2);
       a *= 0.5;
@@ -64,8 +66,8 @@ const FRAG = `
     col += (h(gl_FragCoord.xy + T) - 0.5) * 0.024;
 
     gl_FragColor = vec4(col, 1.0);
-  }
-`;
+  }`;
+}
 
 function compile(gl: WebGLRenderingContext, type: number, src: string) {
   const shader = gl.createShader(type);
@@ -81,8 +83,11 @@ function compile(gl: WebGLRenderingContext, type: number, src: string) {
 
 export default function FoundationShader({ className = "" }: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tier = useQualityTier();
 
   useEffect(() => {
+    if (tier === "low") return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -90,7 +95,7 @@ export default function FoundationShader({ className = "" }: { className?: strin
     if (!gl) return;
 
     const vert = compile(gl, gl.VERTEX_SHADER, VERT);
-    const frag = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    const frag = compile(gl, gl.FRAGMENT_SHADER, buildFragmentShader(4));
     if (!vert || !frag) return;
 
     const program = gl.createProgram();
@@ -170,7 +175,22 @@ export default function FoundationShader({ className = "" }: { className?: strin
       if (buffer) gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
     };
-  }, []);
+  }, [tier]);
+
+  if (tier === "low") {
+    return (
+      <div className={`relative h-full w-full overflow-hidden ${className}`}>
+        <div
+          aria-hidden='true'
+          className='absolute inset-0'
+          style={{
+            background:
+              "radial-gradient(80% 60% at 25% 20%, rgba(75,48,204,0.6) 0%, transparent 62%), radial-gradient(70% 55% at 78% 72%, rgba(157,109,233,0.32) 0%, transparent 66%), radial-gradient(50% 40% at 60% 88%, rgba(242,199,102,0.22) 0%, transparent 70%), #050814",
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`relative h-full w-full ${className}`}>

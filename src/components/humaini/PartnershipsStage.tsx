@@ -186,27 +186,28 @@ export default function PartnershipsStage() {
     if (!stage || !pinPane || !foundationLayer) return;
 
     const ctx = gsap.context(() => {
-      // Mouse move 3D tilt for the floating cleat + photo deck
+      // Mouse move 3D tilt for the floating cleat + photo deck.
+      // quickTo reuses a single tween per property instead of allocating a new
+      // tween on every mousemove, and we only bind on fine pointers.
+      const finePointer = window.matchMedia("(pointer: fine)").matches;
+      const cleatRX = cleat ? gsap.quickTo(cleat, "rotateX", { duration: 0.8, ease: "power2.out" }) : null;
+      const cleatRY = cleat ? gsap.quickTo(cleat, "rotateY", { duration: 0.8, ease: "power2.out" }) : null;
+      const cleatX = cleat ? gsap.quickTo(cleat, "x", { duration: 0.8, ease: "power2.out" }) : null;
+      const cleatY = cleat ? gsap.quickTo(cleat, "y", { duration: 0.8, ease: "power2.out" }) : null;
       const deckRX = deck ? gsap.quickTo(deck, "rotationX", { duration: 0.9, ease: "power3.out" }) : null;
       const deckRY = deck ? gsap.quickTo(deck, "rotationY", { duration: 0.9, ease: "power3.out" }) : null;
 
       const onMouseMove = (e: MouseEvent) => {
         const x = (e.clientX / window.innerWidth - 0.5) * 2;
         const y = (e.clientY / window.innerHeight - 0.5) * 2;
-        if (cleat) {
-          gsap.to(cleat, {
-            rotateY: x * 15,
-            rotateX: -y * 12,
-            x: x * 18,
-            y: y * 14,
-            duration: 0.8,
-            ease: "power2.out"
-          });
-        }
+        cleatRY?.(x * 15);
+        cleatRX?.(-y * 12);
+        cleatX?.(x * 18);
+        cleatY?.(y * 14);
         deckRX?.(-y * 4);
         deckRY?.(x * 6);
       };
-      window.addEventListener("mousemove", onMouseMove, { passive: true });
+      if (finePointer) window.addEventListener("mousemove", onMouseMove, { passive: true });
 
       // Master ScrollTrigger Timeline for the pinned Partnerships -> Foundation diagonal wipe
       const tl = gsap.timeline({

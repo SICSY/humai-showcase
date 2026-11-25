@@ -43,8 +43,8 @@ function prefersReducedMotion() {
 
 export default function HumainiPage() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [isHeroZoomed, setIsHeroZoomed] = useState(false);
   const [isHeroMuted, setIsHeroMuted] = useState(true);
   const [shadesScale, setShadesScale] = useState(0.3);
@@ -88,7 +88,10 @@ export default function HumainiPage() {
     const update = () => {
       frame = 0;
       const max = document.documentElement.scrollHeight - window.innerHeight;
-      setScrollProgress(max > 0 ? Math.min(1, window.scrollY / max) : 0);
+      const progress = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+      if (progressBarRef.current) {
+        progressBarRef.current.style.transform = `scaleX(${progress})`;
+      }
     };
     const onScroll = () => {
       if (!frame) frame = window.requestAnimationFrame(update);
@@ -154,7 +157,7 @@ export default function HumainiPage() {
 
       {/* Progress Line */}
       <div aria-hidden='true' className='fixed inset-x-0 top-0 z-[100] h-[2px] bg-white/5'>
-        <div className='h-full origin-left bg-[#F2C766]' style={{ transform: `scaleX(${scrollProgress})` }} />
+        <div ref={progressBarRef} className='h-full origin-left bg-[#F2C766]' style={{ transform: "scaleX(0)" }} />
       </div>
 
       <SiteHeader />

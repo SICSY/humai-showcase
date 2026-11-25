@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three/webgpu";
+import { useQualityTier } from "@/hooks/useQualityTier";
 import {
   attribute,
   positionGeometry,
@@ -40,8 +41,11 @@ export default function ArcaneButterfliesOverlay({
 }: ArcaneButterfliesOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hintVisible, setHintVisible] = useState(true);
+  const tier = useQualityTier();
 
   useEffect(() => {
+    if (tier !== "high") return;
+
     const container = containerRef.current;
     if (!container || typeof window === "undefined") return;
 
@@ -72,7 +76,7 @@ export default function ArcaneButterfliesOverlay({
     }
 
     // Number of butterflies based on screen width
-    const N = window.innerWidth < 700 ? 24 : 42;
+    const N = window.innerWidth < 900 ? 22 : 34;
     const aPos = new Float32Array(N * 3);
     const aFwd = new Float32Array(N * 3);
     const aUp = new Float32Array(N * 3);
@@ -218,7 +222,7 @@ export default function ArcaneButterfliesOverlay({
     scene.add(bodyMesh);
 
     // Trail particles
-    const P = 2400;
+    const P = 1800;
     const pPosA = new Float32Array(P * 3);
     const pDataA = new Float32Array(P * 4);
     for (let i = 0; i < P; i++) pDataA[i * 4] = -100;
@@ -345,6 +349,15 @@ export default function ArcaneButterfliesOverlay({
     });
     resizeObserver.observe(container);
 
+    let inView = true;
+    const viewObserver = new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+      },
+      { rootMargin: "160px" },
+    );
+    viewObserver.observe(container);
+
     // Initialize WebGPURenderer
     async function start() {
       try {
@@ -370,7 +383,7 @@ export default function ArcaneButterfliesOverlay({
         updateSize();
 
         renderer.setAnimationLoop(() => {
-          if (disposed) return;
+          if (disposed || !inView || document.hidden) return;
           const dt = Math.min(clock.getDelta(), 0.05);
           const t = clock.elapsedTime;
           uTime.value = t;
@@ -490,6 +503,7 @@ export default function ArcaneButterfliesOverlay({
       window.removeEventListener("pointermove", onPtr);
       window.removeEventListener("pointerdown", onPtr);
       resizeObserver.disconnect();
+      viewObserver.disconnect();
 
       const r = renderer as THREE.WebGPURenderer | null;
       if (r) {
@@ -510,7 +524,9 @@ export default function ArcaneButterfliesOverlay({
       ptsGeom.dispose();
       ptsMat.dispose();
     };
-  }, [enableBackground]);
+  }, [enableBackground, tier]);
+
+  if (tier !== "high") return null;
 
   return (
     <div ref={containerRef} className={className} aria-hidden="true">

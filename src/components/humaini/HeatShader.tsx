@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { heatShaderConfig, type HeatShaderConfig } from "@/lib/heatShaderConfig";
+import { useQualityTier } from "@/hooks/useQualityTier";
 
 type HeatShaderProps = Partial<HeatShaderConfig> & {
   className?: string;
@@ -10,7 +11,8 @@ const VERT = `
   void main(){ gl_Position = vec4(p, 0.0, 1.0); }
 `;
 
-const FRAG = `
+function buildFragmentShader(octaves: number, rimRays: number) {
+  return `
   precision highp float;
 
   uniform vec2 R, M, TS;
@@ -28,7 +30,7 @@ const FRAG = `
 
   float fbm(vec2 p){
     float v = 0.0, a = 0.5;
-    for(int i = 0; i < 5; i++){
+    for(int i = 0; i < ${octaves}; i++){
       v += a * n(p);
       p = p * 2.03 + 7.1;
       a *= 0.5;
@@ -84,12 +86,12 @@ const FRAG = `
 
     float l = dot(pc, vec3(0.3, 0.59, 0.11));
     float g = 0.0;
-    for(int i = 0; i < 12; i++){
+    for(int i = 0; i < ${rimRays}; i++){
       float an = float(i) * 0.5236;
       g += ph(fc + d + vec2(cos(an), sin(an)) * (14.0 + 8.0 * H)).a;
       g += ph(fc + d + vec2(cos(an), sin(an)) * 34.0).a * 0.6;
     }
-    g /= 19.2;
+    g /= ${(rimRays * 1.6).toFixed(1)};
 
     float rim = clamp(g - a * 0.6, 0.0, 1.0);
     float ht = l * 0.9 + fbm(uv * 5.0 - T * 0.3) * 0.35 * H + f * 0.2;
@@ -102,8 +104,8 @@ const FRAG = `
     col = pow(col, vec3(0.95));
 
     gl_FragColor = vec4(col, 1.0);
-  }
-`;
+  }`;
+}
 
 function compile(gl: WebGLRenderingContext, type: number, src: string) {
   const shader = gl.createShader(type);
@@ -141,8 +143,11 @@ export default function HeatShader({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const titleProbeRef = useRef<HTMLSpanElement>(null);
   const labelProbeRef = useRef<HTMLSpanElement>(null);
+  const tier = useQualityTier();
 
   useEffect(() => {
+    if (tier === "low") return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -150,7 +155,7 @@ export default function HeatShader({
     if (!gl) return;
 
     const vert = compile(gl, gl.VERTEX_SHADER, VERT);
-    const frag = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    const frag = compile(gl, gl.FRAGMENT_SHADER, buildFragmentShader(4, 8));
     if (!vert || !frag) return;
 
     const program = gl.createProgram();
@@ -344,7 +349,34 @@ export default function HeatShader({
       if (buffer) gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
     };
-  }, [heat, imageSrc, label, palette, title]);
+  }, [heat, imageSrc, label, palette, title, tier]);
+
+  if (tier === "low") {
+    return (
+      <div className={`relative h-full w-full overflow-hidden ${className}`}>
+        <div
+          aria-hidden='true'
+          className='absolute inset-0'
+          style={{
+            background:
+              "radial-gradient(120% 90% at 50% 100%, #4b30cc 0%, #2c1352 38%, #1a0e30 62%, #070410 100%)",
+          }}
+        />
+        <div
+          aria-hidden='true'
+          className='absolute inset-0 opacity-70'
+          style={{
+            background:
+              "radial-gradient(60% 45% at 50% 82%, rgba(242,199,102,0.35) 0%, transparent 70%)",
+          }}
+        />
+        <div className='absolute inset-x-0 bottom-[16%] top-[12%] flex flex-col justify-end px-8 py-10 sm:px-16'>
+          <span className='jj-mono text-[10px] uppercase tracking-[0.32em] text-white/60'>{label}</span>
+          <span className='jj-display mt-2 text-[clamp(3rem,16vw,8rem)] uppercase leading-[0.82] text-[#f6f3ef] drop-shadow-[0_8px_30px_rgba(0,0,0,0.55)]'>{title}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`relative h-full w-full ${className}`}>

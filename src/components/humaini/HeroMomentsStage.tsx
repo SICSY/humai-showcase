@@ -6,6 +6,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Flip } from "gsap/Flip";
 import Signature from "@/components/humaini/Signature";
 import { moments, quoteData } from "@/lib/humaini";
+import { detectQualityTier } from "@/lib/devicePerf";
 
 const JJHero3D = dynamic(() => import("@/components/humaini/JJHero3D"), {
   ssr: false
@@ -71,6 +72,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger, Flip);
+    ScrollTrigger.config({ ignoreMobileResize: true });
 
     const stage = stageRef.current;
     const pinPane = pinPaneRef.current;
@@ -99,6 +101,10 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
       return;
     }
 
+    const lowPower = detectQualityTier() === "low";
+    const giantScale = lowPower ? 1.6 : 2.3;
+    const midScale = lowPower ? 1.15 : 1.35;
+
     const ctx = gsap.context(() => {
       // 1. Ensure Card 1 starts physically in Hero Slot
       heroSlot.appendChild(card1);
@@ -114,7 +120,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
       // 4. Create the genuine GSAP Flip Tween
       const flipTween = Flip.from(flipState, {
         duration: 0.16,
-        rotateY: 360,
+        rotateY: lowPower ? 0 : 360,
         ease: "power2.inOut",
         scale: true,
         absolute: false
@@ -131,7 +137,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
           trigger: stage,
           start: "top top",
           end: "bottom bottom",
-          scrub: 1.0,
+          scrub: lowPower ? true : 1.0,
           anticipatePin: 1,
           invalidateOnRefresh: true
         }
@@ -142,18 +148,25 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
       // =======================================================================
       masterTl.add(flipTween, 0);
 
-      masterTl.fromTo(
-        backdrop,
-        {
-          clipPath: "polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%)"
-        },
-        {
-          clipPath: "polygon(0% -15%, 100% -45%, 100% 100%, 0% 100%)",
-          duration: 0.16,
-          ease: "power2.inOut"
-        },
-        0
-      );
+      if (lowPower) {
+        // Animating a full-screen clip-path repaints the whole viewport on phones.
+        // Fade opacity instead — the visual wipe is kept on desktop only.
+        gsap.set(backdrop, { clipPath: "none" });
+        masterTl.fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: 0.16, ease: "power2.inOut" }, 0);
+      } else {
+        masterTl.fromTo(
+          backdrop,
+          {
+            clipPath: "polygon(0% 100%, 100% 100%, 100% 100%, 0% 100%)"
+          },
+          {
+            clipPath: "polygon(0% -15%, 100% -45%, 100% 100%, 0% 100%)",
+            duration: 0.16,
+            ease: "power2.inOut"
+          },
+          0
+        );
+      }
 
       if (heroContent) {
         masterTl.to(
@@ -211,7 +224,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
       // Behind Card 4 & 5: Fixed Quote appears at GIANT ZOOM (scale: 2.3, x: 4vw, Image 2!)
       if (quoteZoomContainer) {
-        masterTl.fromTo(quoteZoomContainer, { opacity: 0, scale: 2.3, x: "4vw" }, { opacity: 0.85, scale: 2.3, x: "4vw", duration: 0.1, ease: "power1.out" }, 0.38);
+        masterTl.fromTo(quoteZoomContainer, { opacity: 0, scale: giantScale, x: "4vw" }, { opacity: 0.85, scale: giantScale, x: "4vw", duration: 0.1, ease: "power1.out" }, 0.38);
       }
 
       // As Card 5 scrolls off: Cards track, watermark, yardlines fade out
@@ -236,7 +249,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
         masterTl.to(
           quoteZoomContainer,
           {
-            scale: 1.35,
+            scale: midScale,
             x: "0vw",
             opacity: 1.0,
             duration: 0.1,
@@ -265,20 +278,20 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
         );
       }
 
-      // Line 1: solid cream sweeps with athletic diagonal slant across dotted LED (Matches Image 4!)
-      if (lineOverlays[0]) {
-        masterTl.fromTo(lineOverlays[0], { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" }, { clipPath: "polygon(0% 0%, 106% 0%, 100% 100%, 0% 100%)", duration: 0.07, ease: "none" }, 0.58);
-      }
-
-      // Line 2: solid cream sweeps with athletic diagonal slant across dotted LED
-      if (lineOverlays[1]) {
-        masterTl.fromTo(lineOverlays[1], { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" }, { clipPath: "polygon(0% 0%, 106% 0%, 100% 100%, 0% 100%)", duration: 0.07, ease: "none" }, 0.65);
-      }
-
-      // Line 3: solid cream sweeps with athletic diagonal slant across dotted LED
-      if (lineOverlays[2]) {
-        masterTl.fromTo(lineOverlays[2], { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" }, { clipPath: "polygon(0% 0%, 106% 0%, 100% 100%, 0% 100%)", duration: 0.07, ease: "none" }, 0.72);
-      }
+      // Solid ink reveal. On phones, animating clip-path over background-clip
+      // text forces a full repaint each frame, so use opacity instead.
+      const revealLine = (el: HTMLHeadingElement | null, at: number) => {
+        if (!el) return;
+        if (lowPower) {
+          gsap.set(el, { clipPath: "none" });
+          masterTl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.07, ease: "none" }, at);
+        } else {
+          masterTl.fromTo(el, { clipPath: "polygon(0% 0%, 0% 0%, 0% 100%, 0% 100%)" }, { clipPath: "polygon(0% 0%, 106% 0%, 100% 100%, 0% 100%)", duration: 0.07, ease: "none" }, at);
+        }
+      };
+      revealLine(lineOverlays[0], 0.58);
+      revealLine(lineOverlays[1], 0.65);
+      revealLine(lineOverlays[2], 0.72);
 
       // Narrative body text fades in underneath (Matches Image 4!)
       if (quoteBody) {
@@ -316,14 +329,16 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
         heroSlot.appendChild(card1);
       }
     };
-  }, [shadesScale]);
+    // NOTE: intentionally empty — `shadesScale` only drives the WebGL uniform,
+    // rebuilding this scrubbed timeline on every slider tick was thrashing GSAP.
+  }, []);
 
   const moment1 = moments[0];
   const otherMoments = moments.slice(1);
   const isCard1Flipped = !!flippedCards[moment1.index];
 
   return (
-    <section ref={stageRef} id='home' data-section='home-stage' className='relative w-full' style={{ height: "680vh" }}>
+    <section ref={stageRef} id='home' data-section='home-stage' className='relative w-full' style={{ height: "680svh" }}>
       {/* Sticky 100svh Viewport */}
       <div ref={pinPaneRef} data-home-pin='true' className='sticky top-0 h-[100svh] w-full overflow-hidden'>
         {/* =====================================================================
@@ -364,6 +379,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                   >
                     {/* 3D Trading Card Body with 180° Flip */}
                     <div
+                      data-jj-card-body='true'
                       className='relative h-full w-full rounded-[14px] md:rounded-[18px] transition-transform duration-500 ease-out'
                       style={{
                         transformStyle: "preserve-3d",
@@ -373,7 +389,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                     >
                       {/* FRONT FACE (Card Artwork) */}
                       <div className='absolute inset-0 overflow-hidden rounded-[14px] md:rounded-[18px] border-[2.5px] md:border-[3.5px] border-[#c9a24a] bg-[#161232] shadow-2xl' style={{ backfaceVisibility: "hidden" }}>
-                        <Image src={moment1.image} alt={moment1.alt} fill sizes='(max-width: 768px) 72vw, 285px' className='object-cover' priority />
+                        <Image src={moment1.image} alt={moment1.alt} fill sizes='(max-width: 768px) 48vw, 285px' className='object-cover' />
 
                         {/* Gold Foil Border Shimmer */}
                         <div aria-hidden='true' className='pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-60' />
@@ -381,6 +397,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
                         {/* "TONTON" Pill Button */}
                         <div
+                          data-jj-card-pill='true'
                           className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f6f3ef] px-4 py-1.5 font-mono text-[9px] font-extrabold uppercase tracking-[0.24em] text-[#0b0820] shadow-2xl backdrop-blur-md transition-all duration-300 ${
                             hoveredCard === moment1.index && !flippedCards[moment1.index] ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
                           }`}
@@ -399,7 +416,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                       >
                         {moment1.videoUrl && flippedCards[moment1.index] && <video src={moment1.videoUrl} autoPlay loop muted playsInline className='h-full w-full object-cover' />}
 
-                        <div className='absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 p-2.5 backdrop-blur-md'>
+                        <div data-jj-card-info='true' className='absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 p-2.5 backdrop-blur-md'>
                           <p className='font-mono text-[10px] font-bold text-white uppercase truncate'>{moment1.title}</p>
                           <p className='font-mono text-[8px] text-[#c9a24a] uppercase'>{moment1.stat}</p>
                         </div>
@@ -449,7 +466,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
           </div>
 
           {/* Stadium Turf Yardlines (10, 20, 30, 40, 50...) with Authentic Giant Numbers */}
-          <div ref={yardlinesRef} aria-hidden='true' className='pointer-events-none absolute inset-y-0 left-0 z-0 flex items-stretch opacity-0' style={{ width: "420vw" }}>
+          <div ref={yardlinesRef} aria-hidden='true' className='pointer-events-none absolute inset-y-0 left-0 z-0 hidden items-stretch opacity-0 md:flex' style={{ width: "420vw" }}>
             {[10, 20, 30, 40, 50, 40, 30, 20, 10, 20].map((yard, idx) => (
               <div key={idx} className='relative flex h-full w-[37vw] shrink-0 flex-col items-center justify-end border-l border-dashed border-[#e9e4d7]/10 pb-16 md:pb-20'>
                 {/* Upper hash tick marks */}
@@ -540,7 +557,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
               {quoteData.photos[1] && (
                 <div ref={centerPhotoRef} className='absolute z-20 w-[185px] rotate-[-1deg] bg-[#f5f1e8] p-3 pb-5 shadow-[0_36px_85px_rgba(0,0,0,0.98)] sm:w-[240px] md:w-[285px] rounded-[3px] border border-black/10'>
                   <div className='relative aspect-[3/4] w-full overflow-hidden bg-[#171334] rounded-[1px]'>
-                    <Image src={quoteData.photos[1].src} alt={quoteData.photos[1].alt || "Humai"} fill sizes='(max-width: 768px) 185px, 285px' className='object-cover' priority />
+                    <Image src={quoteData.photos[1].src} alt={quoteData.photos[1].alt || "Humai"} fill sizes='(max-width: 768px) 185px, 285px' className='object-cover' />
                   </div>
                   <div className='pt-2 text-center font-mono text-[9px] sm:text-[10px] tracking-[0.24em] text-[#161232]/90 uppercase font-bold'>Humai · 02</div>
                 </div>
@@ -553,7 +570,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
             LAYER 3: HORIZONTAL CARDS TRACK (Z-INDEX 30 - FLOATS IN FRONT OF QUOTE)
         ===================================================================== */}
         <div className='pointer-events-none absolute inset-0 z-30 flex h-full w-full flex-col justify-center'>
-          <div ref={trackRef} className='pointer-events-none flex items-center gap-16 sm:gap-24 md:gap-[15vw] px-[16vw] md:px-[22vw]'>
+          <div ref={trackRef} className='pointer-events-none flex items-center gap-16 sm:gap-24 md:gap-[15vw] px-[16vw] md:px-[22vw]' style={{ willChange: "transform", backfaceVisibility: "hidden" }}>
             {/* =================================================================
                 CARD 1 MOMENTS SLOT (Flip target destination at Yardline 20)
                 Staggered Position: Elevated (-4.5vh)
@@ -615,7 +632,8 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                     >
                       {/* 3D Trading Card Body with 180° Flip */}
                       <div
-                        className='relative h-full w-full rounded-[14px] md:rounded-[18px] transition-transform duration-500 ease-out'
+                        data-jj-card-body='true'
+                      className='relative h-full w-full rounded-[14px] md:rounded-[18px] transition-transform duration-500 ease-out'
                         style={{
                           transformStyle: "preserve-3d",
                           transform: `rotateY(${isFlipped ? 180 : 0}deg) scale(${hoveredCard === moment.index ? 1.04 : 1.0})`,
@@ -624,7 +642,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                       >
                         {/* FRONT FACE (Card Artwork) */}
                         <div className='absolute inset-0 overflow-hidden rounded-[14px] md:rounded-[18px] border-[2.5px] md:border-[3.5px] border-[#c9a24a] bg-[#161232] shadow-2xl' style={{ backfaceVisibility: "hidden" }}>
-                          <Image src={moment.image} alt={moment.alt} fill sizes='(max-width: 768px) 72vw, 285px' className='object-cover' />
+                          <Image src={moment.image} alt={moment.alt} fill sizes='(max-width: 768px) 48vw, 285px' className='object-cover' />
 
                           {/* Gold Foil Border Shimmer */}
                           <div aria-hidden='true' className='pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-60' />
@@ -632,7 +650,8 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
 
                           {/* "TONTON" Pill Button */}
                           <div
-                            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f6f3ef] px-4 py-1.5 font-mono text-[9px] font-extrabold uppercase tracking-[0.24em] text-[#0b0820] shadow-2xl backdrop-blur-md transition-all duration-300 ${
+                            data-jj-card-pill='true'
+                          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f6f3ef] px-4 py-1.5 font-mono text-[9px] font-extrabold uppercase tracking-[0.24em] text-[#0b0820] shadow-2xl backdrop-blur-md transition-all duration-300 ${
                               hoveredCard === moment.index && !isFlipped ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"
                             }`}
                           >
@@ -650,7 +669,7 @@ export default function HeroMomentsStage({ isHeroZoomed = false, onHeroZoomChang
                         >
                           {moment.videoUrl && isFlipped && <video src={moment.videoUrl} autoPlay loop muted playsInline className='h-full w-full object-cover' />}
 
-                          <div className='absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 p-2.5 backdrop-blur-md'>
+                          <div data-jj-card-info='true' className='absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 p-2.5 backdrop-blur-md'>
                             <p className='font-mono text-[10px] font-bold text-white uppercase truncate'>{moment.title}</p>
                             <p className='font-mono text-[8px] text-[#c9a24a] uppercase'>{moment.stat}</p>
                           </div>

@@ -9,8 +9,7 @@ import GoldParticles from "./sculpt/GoldParticles";
 import ManualPostFX from "./sculpt/ManualPostFX";
 import { SCULPT_LOOKS, cycleLook, getLookIndex, getLookState, subscribeLooks } from "./sculpt/looks";
 import { beamFragmentShader, beamVertexShader, ringFragmentShader, ringHaloFragmentShader, ringHaloVertexShader, ringVertexShader, sculptVertexShader } from "./sculpt/shaders";
-
-useGLTF.preload("/man_sculpt.glb");
+import { useQualityTier } from "@/hooks/useQualityTier";
 
 const FILL_HEIGHT = 1.05;
 const FILL_WIDTH = 0.98;
@@ -623,10 +622,11 @@ function ScrambleText({ text }: { text: string }) {
 const SectionSculpt = () => {
   const lookIndex = useSyncExternalStore(subscribeLooks, getLookIndex, () => getLookIndex());
   const look = SCULPT_LOOKS[lookIndex];
+  const tier = useQualityTier();
 
   return (
     <section className='relative h-[100svh] w-full overflow-hidden bg-[#050301]'>
-      <Canvas className='h-full w-full' dpr={[1, 2]} shadows gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} camera={{ position: [0, 0, 4], fov: 35 }}>
+      <Canvas className='h-full w-full' dpr={tier === "high" ? [1, 1.75] : [1, 1.25]} gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} camera={{ position: [0, 0, 4], fov: 35 }}>
         <SculptModel />
 
         <GoldParticles />

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { meltingTextConfig, meltingThemes, type MeltingTheme } from "@/lib/meltingTextConfig";
+import { useQualityTier } from "@/hooks/useQualityTier";
 
 type MeltingTextProps = {
   lines: string[];
@@ -15,7 +16,8 @@ const VERT = `
     gl_Position = vec4(aPos, 0.0, 1.0);
   }`;
 
-const FRAG = `
+function buildFragmentShader(dripSteps: number, glowSteps: number, edgeSteps: number) {
+  return `
   precision highp float;
   varying vec2 vUv;
 
@@ -102,23 +104,23 @@ const FRAG = `
     float len = uMelt * (0.9 + 0.1 * sin(t * 0.8)) * (0.04 + 0.75 * f * f + 0.12 * f2);
 
     float drip = 0.0;
-    for(int i = 0; i < 40; i++){
-      float k = float(i) / 39.0;
+    for(int i = 0; i < ${dripSteps}; i++){
+      float k = float(i) / ${Math.max(dripSteps - 1, 1)}.0;
       float off = k * len;
       vec2 q = uv + vec2(sin(off * 38.0 + t * 1.2) * 0.006 * k, off);
       drip = max(drip, tex(q) * pow(1.0 - k, 1.6));
     }
 
     float glow = 0.0;
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < ${glowSteps}; i++){
       float a = float(i) * 0.7854;
       vec2 d = vec2(cos(a), sin(a));
       glow += tex(uv + d * 0.012) + tex(uv + d * 0.03);
     }
-    glow /= 16.0;
+    glow /= ${glowSteps * 2}.0;
 
     float er = mask;
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < ${edgeSteps}; i++){
       float a = float(i) * 0.7854;
       er = min(er, tex(uv + vec2(cos(a), sin(a)) * 0.0045));
     }
@@ -146,6 +148,7 @@ const FRAG = `
 
     gl_FragColor = vec4(clamp(col, 0.0, 1.0), alpha);
   }`;
+}
 
 function compile(gl: WebGLRenderingContext, type: number, src: string) {
   const shader = gl.createShader(type);
@@ -204,12 +207,15 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const probeRef = useRef<HTMLSpanElement>(null);
   const themeRef = useRef<MeltingTheme>(theme ?? meltingTextConfig.theme);
+  const tier = useQualityTier();
 
   useEffect(() => {
     themeRef.current = theme ?? meltingTextConfig.theme;
   }, [theme]);
 
   useEffect(() => {
+    if (tier === "low") return;
+
     const canvas = canvasRef.current;
     const probe = probeRef.current;
     if (!canvas || !probe) return;
@@ -222,7 +228,7 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
     if (!gl) return;
 
     const vert = compile(gl, gl.VERTEX_SHADER, VERT);
-    const frag = compile(gl, gl.FRAGMENT_SHADER, FRAG);
+    const frag = compile(gl, gl.FRAGMENT_SHADER, buildFragmentShader(28, 6, 6));
     if (!vert || !frag) return;
 
     const program = gl.createProgram();
@@ -271,6 +277,8 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
 
     let disposed = false;
     let raf = 0;
+    let running = false;
+    let visible = true;
     let width = 0;
     let height = 0;
 
@@ -325,7 +333,7 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
     };
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const rect = canvas.getBoundingClientRect();
       width = Math.max(1, Math.round(rect.width * dpr));
       height = Math.max(1, Math.round(rect.height * dpr));
@@ -372,7 +380,15 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
     const started = performance.now();
     let last = started;
     const frame = (now: number) => {
-      if (disposed) return;
+      if (disposed) {
+        running = false;
+        return;
+      }
+      if (!visible || document.hidden) {
+        running = false;
+        raf = 0;
+        return;
+      }
       const t = (now - started) / 1000;
       const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
@@ -410,11 +426,42 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       raf = requestAnimationFrame(frame);
     };
-    raf = requestAnimationFrame(frame);
+
+    const start = () => {
+      if (disposed || running || !visible || document.hidden) return;
+      running = true;
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    };
+    const stop = () => {
+      running = false;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => {
+        visible = entry.isIntersecting;
+        if (visible) start();
+        else stop();
+      },
+      { rootMargin: "160px" },
+    );
+    visibilityObserver.observe(canvas);
+
+    const onVisibilityChange = () => {
+      if (document.hidden) stop();
+      else if (visible) start();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    start();
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(raf);
+      stop();
+      visibilityObserver.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       observer.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
@@ -422,7 +469,33 @@ export default function MeltingText({ lines, theme, className = "" }: MeltingTex
       if (buffer) gl.deleteBuffer(buffer);
       gl.deleteProgram(program);
     };
-  }, [lines]);
+  }, [lines, tier]);
+
+  if (tier === "low") {
+    const palette = meltingTextConfig.palette ?? meltingThemes[theme ?? meltingTextConfig.theme];
+    const fontConfig = meltingTextConfig.font;
+    const rows = (meltingTextConfig.lines ?? lines)
+      .map((line) => (fontConfig.uppercase ? line.trim().toUpperCase() : line.trim()))
+      .filter(Boolean);
+
+    return (
+      <div className={`relative flex flex-col items-center justify-center ${className}`}>
+        {rows.map((row, index) => (
+          <span
+            key={`${row}-${index}`}
+            className='jj-display block text-center leading-[0.94] tracking-tight'
+            style={{
+              fontSize: "clamp(2.6rem, 12.5vw, 5.5rem)",
+              color: palette.mid,
+              WebkitTextStroke: `1px ${palette.low}44`,
+            }}
+          >
+            {row}
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={`relative ${className}`}>

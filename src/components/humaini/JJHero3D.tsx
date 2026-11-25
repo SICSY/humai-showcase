@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import gsap from "gsap";
+import { isLowPowerViewport } from "@/lib/devicePerf";
 
 interface JJHero3DProps {
   className?: string;
@@ -201,6 +202,7 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
+    const lowPower = isLowPowerViewport();
     let renderer: THREE.WebGLRenderer | null = null;
     let scene: THREE.Scene | null = null;
     let camera: THREE.PerspectiveCamera | null = null;
@@ -240,7 +242,7 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
         antialias: true,
         powerPreference: "high-performance",
       });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.2 : 1.6));
     } catch (e) {
       console.warn("WebGL initialization failed:", e);
       return;
@@ -281,7 +283,8 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
 
     // Aspect ratio of humai.png (1456 / 1080 = 1.348148)
     const aspect = 1456 / 1080;
-    geometry = new THREE.PlaneGeometry(aspect, 1, 160, 160);
+    const segments = lowPower ? 64 : 128;
+    geometry = new THREE.PlaneGeometry(aspect, 1, segments, segments);
 
     const vertexShader = `
       varying vec2 vUv;
@@ -351,6 +354,16 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
       }
 
       void main() {
+        // Cheap intro path: before the portrait lands, the frame is just the
+        // full-screen highlight film. Skip depth, normals & glasses sampling.
+        if (uProgress < 0.002) {
+          vec2 introUv = screenCoverUv(gl_FragCoord.xy / uResolution);
+          vec3 intro = texture2D(tVideo, clamp(introUv, 0.0, 1.0)).rgb;
+          intro = pow(intro, vec3(0.92)) * 1.15;
+          gl_FragColor = vec4(intro, 1.0);
+          return;
+        }
+
         // Multi-pass 2.5D parallax mapping using depth map
         float d0 = texture2D(tDepth, vUv).r;
         vec2 pOffset = uPointer * 0.024 * uProgress;
@@ -497,11 +510,31 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
     window.addEventListener("resize", onResize);
     onResize();
 
+    // Stop the hero GPU work as soon as the pinned stage wipes over it.
+    let heroVisible = true;
+    const updateHeroVisibility = () => {
+      const next = !document.hidden && window.scrollY < window.innerHeight * 1.25;
+      if (next === heroVisible) return;
+      heroVisible = next;
+      if (!next) {
+        if (!video.paused) video.pause();
+      } else {
+        video.play().catch(() => {});
+      }
+    };
+    window.addEventListener("scroll", updateHeroVisibility, { passive: true });
+    document.addEventListener("visibilitychange", updateHeroVisibility);
+    updateHeroVisibility();
+
     // Animation frame render loop
     let lastTime = performance.now();
     let hasReady = false;
     const animate = (now: number) => {
       animationFrameId = requestAnimationFrame(animate);
+      if (!heroVisible) {
+        lastTime = now;
+        return;
+      }
 
       // Mark canvas ready after the first real frame (avoids setState during effect body)
       if (!hasReady) {
@@ -572,6 +605,8 @@ export default function JJHero3D({ className = "", onLanded, isZoomed: externalZ
       clearTimeout(introTimer);
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", updateHeroVisibility);
+      document.removeEventListener("visibilitychange", updateHeroVisibility);
       if (renderer) renderer.dispose();
       if (geometry) geometry.dispose();
       if (material) material.dispose();
